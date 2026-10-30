@@ -47,7 +47,7 @@ pathfinder-skill/
 ### 方式一：一条命令安装（推荐，需要 Node.js）
 
 ```bash
-npx skills add __OWNER__/pathfinder-skill
+npx skills add Blossom-stark/pathfinder-skill
 ```
 
 这里用的是开源的 [skills](https://github.com/vercel-labs/skills) 命令行工具，按提示选择要装到哪个 agent。以后要更新，重新运行这条命令即可。
@@ -57,14 +57,14 @@ npx skills add __OWNER__/pathfinder-skill
 在 Claude Code 里依次输入：
 
 ```
-/plugin marketplace add __OWNER__/pathfinder-skill
+/plugin marketplace add Blossom-stark/pathfinder-skill
 /plugin install pathfinder@pathfinder-skill
 ```
 
 ### 方式三：手动复制
 
 ```bash
-git clone https://github.com/__OWNER__/pathfinder-skill.git
+git clone https://github.com/Blossom-stark/pathfinder-skill.git
 ```
 
 然后把 `skills/pathfinder` 文件夹复制到对应 agent 的 skills 目录：
@@ -77,7 +77,7 @@ git clone https://github.com/__OWNER__/pathfinder-skill.git
 
 ### 方式四：Claude 网页版 / 桌面版
 
-从 [Releases](https://github.com/__OWNER__/pathfinder-skill/releases) 下载 `pathfinder.skill`，在 Claude 的设置中找到 Skills 并上传。
+从 [Releases](https://github.com/Blossom-stark/pathfinder-skill/releases) 下载 `pathfinder.skill`，在 Claude 的设置中找到 Skills 并上传。
 
 ### 不支持 skills 的 agent
 
