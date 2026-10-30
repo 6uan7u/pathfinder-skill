@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>知识地图</title>
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --panel-2: #fbfaf7; --ink: #1f1e1b; --muted: #6d6b64; --line: #dcd8cd;
+  --accent: #3355d1; --accent-soft: #e4e9fb;
+  --core: #3355d1; --important: #7e8bb0; --optional: #b5b1a6;
+  --ok: #2b8a3e; --ok-soft: #e2f3e5; --wip: #d9480f; --wip-soft: #fdebdf; --skip: #a9a59b;
+  --anc: #c2255c; --anc-soft: #fbe4ec; --desc: #0c8599; --desc-soft: #ddf3f6;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17171a; --panel: #212126; --panel-2: #1c1c20; --ink: #ecebe6; --muted: #9b998f; --line: #393941;
+    --accent: #7c96ff; --accent-soft: #262d4d;
+    --core: #7c96ff; --important: #8d96b8; --optional: #6a685f;
+    --ok: #51cf66; --ok-soft: #1d3324; --wip: #ff8a4c; --wip-soft: #3a2519; --skip: #6a685f;
+    --anc: #f06595; --anc-soft: #3d1f2b; --desc: #3bc9db; --desc-soft: #173238;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17171a; --panel: #212126; --panel-2: #1c1c20; --ink: #ecebe6; --muted: #9b998f; --line: #393941;
+  --accent: #7c96ff; --accent-soft: #262d4d;
+  --core: #7c96ff; --important: #8d96b8; --optional: #6a685f;
+  --ok: #51cf66; --ok-soft: #1d3324; --wip: #ff8a4c; --wip-soft: #3a2519; --skip: #6a685f;
+  --anc: #f06595; --anc-soft: #3d1f2b; --desc: #3bc9db; --desc-soft: #173238;
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; display: flex; flex-direction: column; }
+button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; cursor: pointer; white-space: nowrap; }
+button:hover { border-color: var(--accent); }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+header { padding: 14px 20px 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.title-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+h1 { font-size: 20px; margin: 0; letter-spacing: .01em; }
+.core { color: var(--muted); margin: 2px 0 0; }
+.problem { margin: 6px 0 0; font-size: 13px; }
+.problem b { color: var(--accent); font-weight: 600; }
+.progress { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.bar { width: 140px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .3s; }
+.toolbar { display: flex; gap: 8px; align-items: center; padding: 10px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.toolbar .spacer { flex: 1; }
+.toolbar input { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; width: 160px; }
+.detours { margin: 8px 0 0; font-size: 13px; }
+.detours summary { cursor: pointer; color: var(--wip); font-weight: 600; }
+.detours ul { margin: 6px 0 0; padding-left: 20px; }
+main { flex: 1; display: flex; min-height: 0; position: relative; }
+#stage { flex: 1; position: relative; min-width: 0; overflow: hidden; }
+#svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#svg.dragging { cursor: grabbing; }
+#route { position: absolute; inset: 0; overflow: auto; padding: 20px; display: none; }
+.legend { position: absolute; left: 14px; bottom: 12px; display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 88%, transparent); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); pointer-events: none; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; border: 2px solid; display: inline-block; }
+.hint { position: absolute; right: 14px; bottom: 12px; font-size: 12px; color: var(--muted); }
+
+/* svg nodes */
+.node rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; transition: opacity .2s; }
+.node text { fill: var(--ink); font-size: 13px; dominant-baseline: central; pointer-events: none; }
+.node { cursor: pointer; }
+.node.p-core rect { stroke: var(--core); stroke-width: 2; }
+.node.p-important rect { stroke: var(--important); }
+.node.p-optional rect { stroke: var(--optional); stroke-dasharray: 4 3; }
+.node.p-optional text { fill: var(--muted); }
+.node.s-mastered rect, .node.s-known rect { fill: var(--ok-soft); }
+.node.s-learning rect { fill: var(--wip-soft); }
+.node.s-skip text { fill: var(--skip); text-decoration: line-through; }
+.node.root rect { fill: var(--accent); stroke: var(--accent); }
+.node.root text { fill: #fff; font-weight: 600; font-size: 15px; }
+.node .mark { font-size: 11px; }
+.node.sel rect { stroke: var(--ink); stroke-width: 2.5; }
+.node.match rect { stroke: var(--wip); stroke-width: 3; }
+.node.anc rect { stroke: var(--anc); stroke-width: 2.5; fill: var(--anc-soft); }
+.node.desc rect { stroke: var(--desc); stroke-width: 2.5; fill: var(--desc-soft); }
+.node.dim, .link.dim { opacity: .18; }
+.toggle circle { fill: var(--panel); stroke: var(--muted); }
+.toggle text { fill: var(--muted); font-size: 12px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.toggle { cursor: pointer; }
+.link { fill: none; stroke: var(--line); stroke-width: 1.6; transition: opacity .2s; }
+.link.anc { stroke: var(--anc); stroke-width: 2.2; }
+.link.desc { stroke: var(--desc); stroke-width: 2.2; }
+.col-label { fill: var(--muted); font-size: 12px; text-anchor: middle; }
+
+/* side panel */
+#panel { width: 360px; border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 18px 20px 28px; display: none; }
+#panel.open { display: block; }
+#panel h2 { font-size: 18px; margin: 0 26px 6px 0; }
+#panel .close { position: absolute; right: 12px; top: 12px; border: none; background: none; font-size: 18px; color: var(--muted); }
+.panel-wrap { position: relative; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.badge.core { border-color: var(--core); color: var(--core); }
+.sec { margin: 14px 0 0; }
+.sec h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 4px; font-weight: 600; }
+.sec p { margin: 0; }
+.sec ul { margin: 0; padding-left: 18px; }
+.sec.check { background: var(--accent-soft); padding: 10px 12px; border-radius: 8px; }
+.sec.pit li { color: var(--wip); }
+.sec.pit li span { color: var(--ink); }
+.status-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.status-btns button { padding: 3px 10px; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 13px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; }
+.chip.s-mastered, .chip.s-known { background: var(--ok-soft); border-color: var(--ok); }
+.chip.s-learning { background: var(--wip-soft); border-color: var(--wip); }
+.chip.s-skip { text-decoration: line-through; color: var(--skip); }
+.chip.p-optional { border-style: dashed; color: var(--muted); }
+.chip.p-core { font-weight: 600; }
+
+/* route */
+.stages { display: flex; gap: 28px; align-items: stretch; min-width: min-content; }
+.stagecard { position: relative; width: 270px; flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; }
+.stagecard:not(:last-child)::after { content: "→"; position: absolute; right: -22px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 18px; }
+.stagecard h3 { margin: 0; font-size: 15px; }
+.stagecard .goal { color: var(--muted); font-size: 13px; margin: 0; }
+.stagecard .kv { font-size: 13px; margin: 0; }
+.stagecard .kv b { color: var(--muted); font-weight: 600; }
+.stagecard .decision { background: var(--wip-soft); border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+.mini { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.mini > i { display: block; height: 100%; background: var(--ok); }
+.empty { color: var(--muted); padding: 40px; text-align: center; }
+
+/* focus board */
+#focus { position: absolute; inset: 0; overflow: auto; padding: 20px; display: none; }
+.board { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+.card.wide { grid-column: 1 / -1; }
+.card h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.card p { margin: 0; }
+.card ul, .card ol { margin: 0; padding-left: 20px; }
+.card li + li { margin-top: 4px; }
+.card .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.card.goal p.big { font-size: 17px; font-weight: 600; }
+.card.priority { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent), var(--shadow); }
+.card.priority p.big { font-size: 18px; font-weight: 700; color: var(--accent); }
+.card.today { background: var(--accent-soft); border-color: var(--accent); }
+.card.today p { font-weight: 600; }
+.card.not li { list-style: none; margin-left: -20px; }
+.card.not li::before { content: "✕ "; color: var(--wip); font-weight: 700; }
+.formula { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
+.factors { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.factor { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-width: 120px; flex: 1; }
+.factor b { display: block; font-size: 14px; }
+.factor span { font-size: 12px; color: var(--muted); }
+.factor.bn { border: 2px solid var(--wip); background: var(--wip-soft); }
+.factor.bn b::after { content: " ← 瓶颈"; color: var(--wip); font-size: 12px; }
+.metrics { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
+.metrics dt { color: var(--muted); }
+.metrics dd { margin: 0; }
+.tier { font-size: 11px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-left: 4px; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+.toast.show { opacity: 1; }
+
+@media (max-width: 760px) {
+  header, .toolbar { padding-left: 16px; padding-right: 16px; }
+  .progress { margin-left: 0; width: 100%; }
+  .toolbar input { width: 110px; }
+  main { flex-direction: column; }
+  #panel { width: 100%; max-height: 55%; border-left: none; border-top: 1px solid var(--line); }
+  .stages { flex-direction: column; min-width: 0; }
+  #focus { padding: 16px; }
+  .board { grid-template-columns: 1fr; }
+  .stagecard { width: 100%; }
+  .stagecard:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -24px; transform: translateX(50%); }
+  .legend { display: none; }
+  .hint { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="title-row">
+    <h1 id="topic"></h1>
+    <div class="progress"><span id="ptext"></span><div class="bar"><i id="pbar"></i></div></div>
+  </div>
+  <p class="core" id="core"></p>
+  <p class="problem" id="problem"></p>
+  <details class="detours" id="detours"><summary></summary><ul></ul></details>
+</header>
+<div class="toolbar">
+  <div class="tabs">
+    <button data-view="focus" id="tab-focus" style="display:none">聚焦</button>
+    <button data-view="tree" class="on">思维导图</button>
+    <button data-view="dag">依赖图</button>
+    <button data-view="route">路线</button>
+  </div>
+  <button id="fit" title="适应窗口">⤢ 适应</button>
+  <span class="spacer"></span>
+  <input id="search" placeholder="搜索节点…" autocomplete="off">
+  <button id="export" title="复制进度，粘贴回对话即可同步">导出进度</button>
+  <button id="theme" title="切换深浅色">◐</button>
+</div>
+<main>
+  <div id="stage">
+    <svg id="svg"><g id="viewport"></g></svg>
+    <div id="route"></div>
+    <div id="focus"></div>
+    <div class="legend">
+      <span><i class="sw" style="border-color:var(--core)"></i>核心</span>
+      <span><i class="sw" style="border-color:var(--important)"></i>重要</span>
+      <span><i class="sw" style="border-color:var(--optional);border-style:dashed"></i>可选</span>
+      <span><i class="sw" style="border-color:var(--line);background:var(--ok-soft)"></i>已掌握/已会</span>
+      <span><i class="sw" style="border-color:var(--line);background:var(--wip-soft)"></i>学习中</span>
+      <span id="lg-dag" style="display:none"><i class="sw" style="border-color:var(--anc);background:var(--anc-soft)"></i>前置　<i class="sw" style="border-color:var(--desc);background:var(--desc-soft)"></i>后续</span>
+    </div>
+    <div class="hint">拖拽平移 · 滚轮缩放 · 点击节点看详情</div>
+  </div>
+  <aside id="panel"><div class="panel-wrap"><button class="close" id="close" aria-label="关闭">✕</button><div id="pbody"></div></div></aside>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const DATA = {"topic": "傅里叶变换", "slug": "fourier-transform", "mode": "concept", "problem": "一个复杂的波形（声音、图像、信号），能不能拆成简单波形的组合，从而单独分析和处理每一个频率？", "core": "把任意信号拆成不同频率正弦波的「配方表」：每种频率用了多少、从哪里开始", "learner": "懂三角函数和基本积分，没学过信号处理", "updated": "2026-10-30", "detours": ["一上来就啃复数指数形式和积分推导——先用动画建立「缠绕」直觉，公式会变得显然", "以为必须先学完复变函数才能理解——只需要知道欧拉公式表示「绕圈」即可", "混淆傅里叶级数（周期信号）和傅里叶变换（任意信号）——前者是后者的特例，先学级数更容易"], "nodes": [{"id": "sine", "label": "正弦波三要素", "parent": "foundation", "priority": "core", "status": "known", "summary": "振幅、频率、相位完全决定一个正弦波。", "why": "傅里叶变换的输出就是每个频率的振幅和相位。", "pitfalls": ["混淆角频率 ω 和频率 f：ω = 2πf"], "check": "两个频率相同、相位差 180° 的正弦波相加会怎样？", "est": "10 分钟"}, {"id": "foundation", "label": "基础", "priority": "core", "summary": "理解傅里叶变换需要的前置知识。"}, {"id": "superposition", "label": "波的叠加", "parent": "foundation", "prereqs": ["sine"], "priority": "core", "status": "learning", "summary": "多个波逐点相加，得到一个新的、看起来更复杂的波。", "why": "傅里叶的核心主张就是：复杂波 = 简单波之和，这是反过来的方向。", "analogy": "和弦是几个音同时响：耳朵听到的是一个声音，但它由几个纯音叠加而成。", "check": "方波看起来全是直角，它怎么可能由光滑的正弦波组成？", "est": "15 分钟"}, {"id": "euler", "label": "欧拉公式（绕圈）", "parent": "foundation", "prereqs": ["sine"], "priority": "important", "summary": "e^{iθ} 表示复平面上单位圆上的一点；θ 增加就是在绕圈。", "why": "傅里叶变换公式用它来表示「以某个频率绕圈」，写起来比 sin/cos 简洁。", "pitfalls": ["把 i 当成神秘的东西——这里只需要把它理解为「旋转 90°」"], "est": "20 分钟"}, {"id": "intuition", "label": "核心直觉", "priority": "core", "summary": "傅里叶变换到底在做什么。"}, {"id": "correlation", "label": "相关性：测量含有多少某频率", "parent": "intuition", "prereqs": ["superposition"], "priority": "core", "summary": "把信号和某个频率的正弦波逐点相乘再求和：如果信号里含有这个频率，结果就大；不含，正负抵消接近 0。", "why": "这是傅里叶变换最核心的一招——所有公式都是在反复做这件事。", "analogy": "像用不同音高的音叉去靠近钢琴：只有频率对上的那根弦会共振。", "check": "为什么两个频率不同的正弦波相乘后，在长时间内求和会趋近于 0？", "est": "30 分钟"}, {"id": "winding", "label": "缠绕与重心", "parent": "intuition", "prereqs": ["correlation", "euler"], "priority": "core", "summary": "把信号以频率 f 缠绕在圆上，看图形的重心离原点多远：f 对上信号中的频率时，重心会突然偏离原点。", "why": "这是理解复数形式公式最直观的方式。", "pitfalls": ["以为缠绕频率就是信号频率——它是我们在「扫描」的试探频率"], "est": "30 分钟"}, {"id": "spectrum", "label": "频谱", "parent": "intuition", "prereqs": ["correlation"], "priority": "core", "summary": "横轴是频率、纵轴是该频率的强度的图。它是信号的「配方表」。", "check": "一段只有 440Hz 纯音的录音，频谱长什么样？", "est": "15 分钟"}, {"id": "formal", "label": "公式与计算", "priority": "important", "summary": "把直觉写成数学，并在计算机上实现。"}, {"id": "formula", "label": "变换公式", "parent": "formal", "prereqs": ["winding"], "priority": "important", "summary": "F(f) = ∫ x(t)·e^{-2πift} dt：对每个试探频率 f，做一次「缠绕后求重心」。", "est": "30 分钟"}, {"id": "inverse", "label": "逆变换", "parent": "formal", "prereqs": ["formula"], "priority": "important", "summary": "用配方表把信号重新合成回来：信息没有丢失，只是换了一种描述方式。", "est": "15 分钟"}, {"id": "dft", "label": "DFT 与 FFT", "parent": "formal", "prereqs": ["formula"], "priority": "optional", "summary": "计算机处理的是离散采样点；FFT 是计算 DFT 的快速算法，复杂度从 N² 降到 N log N。", "est": "45 分钟"}, {"id": "apps", "label": "应用", "priority": "important", "summary": "傅里叶变换在哪里被使用。"}, {"id": "filter", "label": "滤波与去噪", "parent": "apps", "prereqs": ["spectrum", "inverse"], "priority": "important", "summary": "变换到频域 → 去掉不想要的频率 → 逆变换回来。", "est": "20 分钟"}, {"id": "compress", "label": "压缩（JPEG / MP3）", "parent": "apps", "prereqs": ["spectrum"], "priority": "optional", "summary": "人感知不到的频率成分可以丢掉，用更少的数据描述信号。", "est": "15 分钟"}], "stages": [{"id": "s1", "label": "阶段 1：复杂波 = 简单波之和", "goal": "相信并看到「任何波形都能拆」", "nodes": ["sine", "superposition"], "deliverable": "能解释方波如何由正弦波叠加近似"}, {"id": "s2", "label": "阶段 2：怎么拆出来", "goal": "理解用相关性/缠绕检测频率", "nodes": ["correlation", "euler", "winding", "spectrum"], "deliverable": "看懂缠绕动画，能预测给定信号的频谱"}, {"id": "s3", "label": "阶段 3：写成公式", "goal": "把直觉翻译成数学和代码", "nodes": ["formula", "inverse", "dft"], "deliverable": "用 numpy.fft 对一段音频画出频谱", "decision": "只想理解原理就到 inverse 为止；要写代码处理数据再学 DFT/FFT"}, {"id": "s4", "label": "阶段 4：用起来", "goal": "在真实问题中使用", "nodes": ["filter", "compress"], "deliverable": "给一段带噪音的录音做低通滤波"}]};
+
+(function () {
+  "use strict";
+  if (!DATA || !Array.isArray(DATA.nodes)) {
+    document.getElementById("stage").innerHTML = '<p class="empty">没有地图数据。请用 build_map.py 生成此页面。</p>';
+    return;
+  }
+
+  // ---------- data model ----------
+  const ROOT_ID = "__root__";
+  const STATUS = { todo: "未开始", learning: "学习中", mastered: "已掌握", known: "已会", skip: "跳过" };
+  const PRIORITY = { core: "核心", important: "重要", optional: "可选" };
+  const root = { id: ROOT_ID, label: DATA.topic || "主题", priority: "core", summary: DATA.core, why: DATA.problem, isRoot: true };
+  const nodes = DATA.nodes.map(n => Object.assign({}, n, { id: String(n.id) }));
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  byId.set(ROOT_ID, root);
+  const kids = new Map([[ROOT_ID, []]]);
+  nodes.forEach(n => kids.set(n.id, []));
+  nodes.forEach(n => {
+    const p = n.parent != null && byId.has(String(n.parent)) && String(n.parent) !== n.id ? String(n.parent) : ROOT_ID;
+    n._parent = p;
+    kids.get(p).push(n);
+  });
+  nodes.forEach(n => { n._pre = (n.prereqs || []).map(String).filter(id => byId.has(id) && id !== n.id && id !== ROOT_ID); });
+  const deps = new Map(nodes.map(n => [n.id, []]));
+  nodes.forEach(n => n._pre.forEach(p => deps.get(p).push(n.id)));
+  const hasDag = nodes.some(n => n._pre.length);
+  // Pure grouping nodes (have children, no dependency edges) organise the mind map but are not things to learn.
+  const isGroup = n => kids.get(n.id).length > 0 && !n._pre.length && !deps.get(n.id).length;
+  const items = nodes.filter(n => !isGroup(n));
+
+  // Progress lives in the browser; a status Claude later changes in map.json wins over a stale local one.
+  const KEY = "pathfinder:" + (DATA.slug || DATA.topic || "map");
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  const statusOf = n => {
+    if (n.isRoot) return "";
+    const s = saved[n.id];
+    if (s && s.base === (n.status || "todo")) return s.s;
+    return n.status || "todo";
+  };
+  function setStatus(id, s) {
+    const n = byId.get(id);
+    saved[id] = { s: s, base: n.status || "todo" };
+    try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    renderAll();
+    showDetail(id);
+  }
+
+  // ---------- helpers ----------
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const ctx = document.createElement("canvas").getContext("2d");
+  ctx.font = "13px system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+  const MAXW = 210;
+  function fit(label, extra) {
+    let t = String(label);
+    const room = MAXW - 28 - (extra || 0);
+    if (ctx.measureText(t).width > room) {
+      while (t.length > 1 && ctx.measureText(t + "…").width > room) t = t.slice(0, -1);
+      t += "…";
+    }
+    return { text: t, w: Math.max(56, Math.ceil(ctx.measureText(t).width) + 28 + (extra || 0)) };
+  }
+  const MARK = { mastered: "✓", known: "✓", learning: "●", skip: "–" };
+  const cls = n => "node" + (n.isRoot ? " root" : " p-" + (n.priority || "important") + " s-" + statusOf(n));
+  function nodeSvg(n, x, y, h, extraCls) {
+    const mark = MARK[statusOf(n)] || "";
+    const f = n.isRoot ? { text: n.label, w: Math.ceil(ctx.measureText(n.label).width * 1.2) + 36 } : fit(n.label, mark ? 14 : 0);
+    n._w = f.w;
+    const fill = statusOf(n) === "learning" ? "var(--wip)" : "var(--ok)";
+    return '<g class="' + cls(n) + (extraCls || "") + '" data-id="' + esc(n.id) + '" transform="translate(' + x + "," + y + ')">' +
+      "<title>" + esc(n.label) + "</title>" +
+      '<rect y="' + (-h / 2) + '" width="' + f.w + '" height="' + h + '" rx="8"></rect>' +
+      '<text x="14" y="0">' + esc(f.text) + "</text>" +
+      (mark ? '<text class="mark" x="' + (f.w - 16) + '" y="0" style="fill:' + fill + '">' + mark + "</text>" : "") +
+      "</g>";
+  }
+  const curve = (x1, y1, x2, y2) => { const dx = Math.max(24, (x2 - x1) / 2); return "M" + x1 + "," + y1 + " C" + (x1 + dx) + "," + y1 + " " + (x2 - dx) + "," + y2 + " " + x2 + "," + y2; };
+  const widthOf = n => n.isRoot ? Math.ceil(ctx.measureText(n.label).width * 1.2) + 36 : fit(n.label, MARK[statusOf(n)] ? 14 : 0).w;
+
+  // ---------- view state ----------
+  let view = "tree", selected = null, query = "";
+  const collapsed = new Set();
+  const vp = $("#viewport"), svg = $("#svg");
+  let tx = 40, ty = 40, k = 1;
+  const applyT = () => vp.setAttribute("transform", "translate(" + tx + "," + ty + ") scale(" + k + ")");
+
+  // ---------- mind map ----------
+  function renderTree() {
+    const ROW = 42, GAP = 60, H = 30;
+    let leaf = 0;
+    const colW = [];
+    const order = [];
+    (function walk(n, d) {
+      n._d = d; order.push(n);
+      colW[d] = Math.max(colW[d] || 0, widthOf(n));
+      const ch = collapsed.has(n.id) ? [] : kids.get(n.id);
+      if (!ch.length) { n._y = leaf++ * ROW; return; }
+      ch.forEach(c => walk(c, d + 1));
+      n._y = (ch[0]._y + ch[ch.length - 1]._y) / 2;
+    })(root, 0);
+    const colX = [0];
+    for (let i = 1; i < colW.length; i++) colX[i] = colX[i - 1] + colW[i - 1] + GAP;
+    let links = "", body = "";
+    order.forEach(n => {
+      n._x = colX[n._d];
+      if (n !== root) {
+        const p = byId.get(n._parent);
+        links += '<path class="link" d="' + curve(p._x + widthOf(p) + (kids.get(p.id).length ? 12 : 0), p._y, n._x, n._y) + '"></path>';
+      }
+    });
+    order.forEach(n => {
+      body += nodeSvg(n, n._x, n._y, n.isRoot ? 38 : H, (selected === n.id ? " sel" : "") + (matches(n) ? " match" : ""));
+      if (kids.get(n.id).length) {
+        const c = collapsed.has(n.id);
+        body += '<g class="toggle" data-toggle="' + esc(n.id) + '" transform="translate(' + (n._x + n._w + 12) + "," + n._y + ')"><circle r="8"></circle><text>' + (c ? "+" + kids.get(n.id).length : "−") + "</text></g>";
+      }
+    });
+    vp.innerHTML = links + body;
+  }
+
+  // ---------- dependency graph ----------
+  function levels() {
+    const lv = new Map(), visiting = new Set();
+    const get = n => {
+      if (lv.has(n.id)) return lv.get(n.id);
+      if (visiting.has(n.id)) return 0; // cycle guard
+      visiting.add(n.id);
+      const l = n._pre.length ? 1 + Math.max.apply(null, n._pre.map(p => get(byId.get(p)))) : 0;
+      visiting.delete(n.id);
+      lv.set(n.id, l);
+      return l;
+    };
+    nodes.forEach(get);
+    return lv;
+  }
+  function closure(id, next) {
+    const out = new Set(), stack = [id];
+    while (stack.length) next(stack.pop()).forEach(x => { if (!out.has(x)) { out.add(x); stack.push(x); } });
+    return out;
+  }
+  const ancestors = id => closure(id, x => byId.get(x)._pre || []);
+  const descendants = id => closure(id, x => deps.get(x) || []);
+
+  function renderDag() {
+    if (!hasDag) { vp.innerHTML = '<text x="0" y="0" class="col-label" style="text-anchor:start;font-size:14px">这张地图还没有定义先修关系（prereqs），请看思维导图或路线视图。</text>'; return; }
+    const lv = levels();
+    const maxL = Math.max.apply(null, Array.from(lv.values()));
+    const cols = Array.from({ length: maxL + 1 }, () => []);
+    const dfsIdx = new Map();
+    let i = 0;
+    (function walk(n) { dfsIdx.set(n.id, i++); kids.get(n.id).forEach(walk); })(root);
+    items.forEach(n => cols[lv.get(n.id)].push(n));
+    cols.forEach(c => c.sort((a, b) => dfsIdx.get(a.id) - dfsIdx.get(b.id)));
+    const ROW = 46, GAP = 90, H = 30;
+    const pos = new Map();
+    const place = () => cols.forEach(c => c.forEach((n, j) => pos.set(n.id, j)));
+    place();
+    for (let pass = 0; pass < 4; pass++) { // barycenter ordering to reduce crossings
+      for (let c = 1; c < cols.length; c++) {
+        cols[c].forEach(n => { n._bc = n._pre.length ? n._pre.reduce((s, p) => s + pos.get(p), 0) / n._pre.length : pos.get(n.id); });
+        cols[c].sort((a, b) => a._bc - b._bc);
+        place();
+      }
+    }
+    const colW = cols.map(c => Math.max.apply(null, c.map(widthOf)));
+    const maxRows = Math.max.apply(null, cols.map(c => c.length));
+    let x = 0, links = "", body = "", labels = "";
+    cols.forEach((c, ci) => {
+      const off = (maxRows - c.length) * ROW / 2;
+      c.forEach((n, j) => { n._x = x; n._y = off + j * ROW; });
+      labels += '<text class="col-label" x="' + (x + colW[ci] / 2) + '" y="-34">' + (ci === 0 ? "起点：无需前置" : "第 " + (ci + 1) + " 层") + "</text>";
+      x += colW[ci] + GAP;
+    });
+    let anc = new Set(), desc = new Set();
+    if (selected && selected !== ROOT_ID) { anc = ancestors(selected); desc = descendants(selected); }
+    const focus = selected && selected !== ROOT_ID;
+    nodes.forEach(n => n._pre.forEach(pid => {
+      const p = byId.get(pid);
+      let c = "link";
+      if (focus) {
+        if ((anc.has(pid) || pid === selected) && (anc.has(n.id) || n.id === selected)) c += " anc";
+        else if ((desc.has(n.id)) && (desc.has(pid) || pid === selected)) c += " desc";
+        else c += " dim";
+      }
+      links += '<path class="' + c + '" marker-end="url(#arr)" d="' + curve(p._x + widthOf(p), p._y, n._x - 4, n._y) + '"></path>';
+    }));
+    items.forEach(n => {
+      let extra = matches(n) ? " match" : "";
+      if (focus) extra += n.id === selected ? " sel" : anc.has(n.id) ? " anc" : desc.has(n.id) ? " desc" : " dim";
+      body += nodeSvg(n, n._x, n._y, H, extra);
+    });
+    vp.innerHTML = '<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path></marker></defs>' + labels + links + body;
+  }
+
+  // ---------- route ----------
+  function chip(n) { return '<span class="chip p-' + (n.priority || "important") + " s-" + statusOf(n) + '" data-id="' + esc(n.id) + '">' + (MARK[statusOf(n)] ? MARK[statusOf(n)] + " " : "") + esc(n.label) + "</span>"; }
+  const done = n => ["mastered", "known"].includes(statusOf(n));
+  function stageCard(s, list) {
+    const counted = list.filter(n => statusOf(n) !== "skip");
+    const pct = counted.length ? Math.round(100 * counted.filter(done).length / counted.length) : 0;
+    return '<div class="stagecard"><h3>' + esc(s.label) + "</h3>" +
+      (s.goal ? '<p class="goal">' + esc(s.goal) + "</p>" : "") +
+      '<div class="mini"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="chips">' + list.map(chip).join("") + "</div>" +
+      (s.deliverable ? '<p class="kv"><b>产出：</b>' + esc(s.deliverable) + "</p>" : "") +
+      (s.decision ? '<div class="decision"><b>决策点：</b>' + esc(s.decision) + "</div>" : "") + "</div>";
+  }
+  function renderRoute() {
+    let stages = [];
+    if (Array.isArray(DATA.stages) && DATA.stages.length) {
+      const used = new Set();
+      stages = DATA.stages.map(s => { const list = (s.nodes || []).map(String).filter(id => byId.has(id) && id !== ROOT_ID).map(id => byId.get(id)); list.forEach(n => used.add(n.id)); return [s, list]; });
+      const rest = items.filter(n => !used.has(n.id));
+      if (rest.length) stages.push([{ label: "未分配阶段", goal: "这些节点还没有放进任何阶段" }, rest]);
+    } else if (hasDag) {
+      const lv = levels();
+      const max = Math.max.apply(null, Array.from(lv.values()));
+      for (let l = 0; l <= max; l++) stages.push([{ label: "第 " + (l + 1) + " 步", goal: l === 0 ? "无需前置，可以直接开始" : "需要先完成前面的步骤" }, items.filter(n => lv.get(n.id) === l)]);
+    } else {
+      kids.get(ROOT_ID).forEach((top, idx) => {
+        const list = [];
+        (function walk(n) { list.push(n); kids.get(n.id).forEach(walk); })(top);
+        stages.push([{ label: (idx + 1) + ". " + top.label, goal: top.summary || "" }, list]);
+      });
+    }
+    $("#route").innerHTML = '<div class="stages">' + stages.map(p => stageCard(p[0], p[1])).join("") + "</div>";
+  }
+
+  // ---------- focus board ----------
+  function renderFocus() {
+    const F = DATA.focus || {};
+    const card = (title, body, c) => body ? '<div class="card' + (c ? " " + c : "") + '"><h3>' + title + "</h3>" + body + "</div>" : "";
+    const ul = (a, tag) => a && a.length ? "<" + (tag || "ul") + ">" + a.map(x => "<li>" + x + "</li>").join("") + "</" + (tag || "ul") + ">" : "";
+    let html = "";
+    html += card("你真正要的", F.goal ? '<p class="big">' + esc(F.goal) + "</p>" + (F.success ? '<p class="sub">成功标志：' + esc(F.success) + "</p>" : "") : "", "goal wide");
+    const factors = (F.factors || []).map(f => '<div class="factor' + (f.bottleneck ? " bn" : "") + '"><b>' + esc(f.name) + "</b>" + (f.state ? "<span>" + esc(f.state) + "</span>" : "") + "</div>").join("");
+    html += card("本质公式", (F.formula ? '<div class="formula">' + esc(F.formula) + "</div>" : "") + (factors ? '<div class="factors">' + factors + "</div>" : "") + (F.bottleneck ? '<p class="sub" style="margin-top:10px">瓶颈判断：' + esc(F.bottleneck) + "</p>" : ""), "wide");
+    html += card("接下来唯一的重点", F.priority ? '<p class="big">' + esc(F.priority) + "</p>" : "", "priority wide");
+    html += card("只需要先知道这些", ul((F.essentials || []).map(esc), "ol"));
+    const nd = (F.not_doing || []).map(x => typeof x === "string" ? esc(x) : esc(x.item) + (x.why || x.until ? '<div class="sub">' + esc([x.why, x.until ? "何时再考虑：" + x.until : ""].filter(Boolean).join("；")) + "</div>" : ""));
+    html += card("不做清单", ul(nd), "not");
+    const M = F.metrics || {};
+    const rows = [["领先指标", M.leading], ["结果指标", M.outcome], ["复盘", M.review], ["止损/转向", F.stop_rule]].filter(r => r[1]);
+    html += card("衡量方式", rows.length ? '<dl class="metrics">' + rows.map(r => "<dt>" + r[0] + "</dt><dd>" + esc(r[1]) + "</dd>").join("") + "</dl>" : "");
+    html += card("值得跟的信息源", ul((F.sources || []).map(s => typeof s === "string" ? esc(s) : esc(s.name) + (s.tier ? '<span class="tier">' + esc(s.tier) + "</span>" : "") + (s.why ? '<div class="sub">' + esc(s.why) + "</div>" : ""))));
+    html += card("今天就做", F.today ? "<p>👉 " + esc(F.today) + "</p>" : "", "today wide");
+    $("#focus").innerHTML = '<div class="board">' + html + "</div>";
+  }
+
+  // ---------- detail panel ----------
+  function topoSort(ids) {
+    const lv = levels();
+    return Array.from(ids).map(id => byId.get(id)).sort((a, b) => lv.get(a.id) - lv.get(b.id));
+  }
+  function showDetail(id) {
+    const n = byId.get(id);
+    if (!n) return;
+    const sec = (title, html, c) => html ? '<div class="sec' + (c ? " " + c : "") + '"><h3>' + title + "</h3>" + html + "</div>" : "";
+    const p = s => s ? "<p>" + esc(s) + "</p>" : "";
+    const list = a => a && a.length ? "<ul>" + a.map(x => "<li><span>" + esc(x) + "</span></li>").join("") + "</ul>" : "";
+    let html = "<h2>" + esc(n.label) + "</h2>";
+    if (!n.isRoot) {
+      html += '<div class="badges"><span class="badge ' + (n.priority === "core" ? "core" : "") + '">' + (PRIORITY[n.priority] || "重要") + '</span><span class="badge">' + STATUS[statusOf(n)] + "</span>" + (n.est ? '<span class="badge">⏱ ' + esc(n.est) + "</span>" : "") + (n.source ? '<span class="badge">📄 ' + esc(n.source) + "</span>" : "") + "</div>";
+    }
+    html += sec(n.isRoot ? "一句话" : "是什么", p(n.summary));
+    html += sec(n.isRoot ? "它解决的问题" : "为什么要学", p(n.why));
+    html += sec("打个比方", p(n.analogy));
+    html += sec("常见误区", list(n.pitfalls), "pit");
+    html += sec("检验自己", p(n.check), "check");
+    if (!n.isRoot) {
+      const anc = topoSort(ancestors(id));
+      const todo = anc.filter(a => !done(a) && statusOf(a) !== "skip").length;
+      html += sec("学它之前需要" + (anc.length ? "（" + (todo ? todo + " 个未掌握" : "都已具备 ✓") + "）" : ""), anc.length ? '<div class="chips">' + anc.map(chip).join("") + "</div>" : "<p>无需前置，可以直接开始。</p>");
+      const d = (deps.get(id) || []).map(x => byId.get(x));
+      html += sec("掌握后解锁", d.length ? '<div class="chips">' + d.map(chip).join("") + "</div>" : "");
+      const ch = kids.get(id);
+      html += sec("包含", ch.length ? '<div class="chips">' + ch.map(chip).join("") + "</div>" : "");
+    }
+    html += sec("资源", list(n.resources));
+    if (n.isRoot && DATA.learner) html += sec("你的起点", p(DATA.learner));
+    if (!n.isRoot) {
+      html += sec("我的状态", '<div class="status-btns">' + Object.keys(STATUS).map(s => '<button data-status="' + s + '" class="' + (statusOf(n) === s ? "on" : "") + '">' + STATUS[s] + "</button>").join("") + "</div>");
+    }
+    $("#pbody").innerHTML = html;
+    $("#pbody").dataset.id = id;
+    $("#panel").classList.add("open");
+  }
+
+  // ---------- progress & header ----------
+  function renderHeader() {
+    document.title = (DATA.topic || "知识地图") + " · 知识地图";
+    $("#topic").textContent = DATA.topic || "知识地图";
+    $("#core").textContent = DATA.core || "";
+    $("#problem").innerHTML = DATA.problem ? "<b>本质问题</b>　" + esc(DATA.problem) : "";
+    const det = DATA.detours || [];
+    if (det.length) {
+      $("#detours summary").textContent = "⚠ 避开这些弯路（" + det.length + "）";
+      $("#detours ul").innerHTML = det.map(d => "<li>" + esc(d) + "</li>").join("");
+    } else $("#detours").style.display = "none";
+  }
+  function renderProgress() {
+    const pool = items.filter(n => n.priority !== "optional" && statusOf(n) !== "skip");
+    const d = pool.filter(done).length;
+    $("#ptext").textContent = "主干进度 " + d + "/" + pool.length;
+    $("#pbar").style.width = (pool.length ? 100 * d / pool.length : 0) + "%";
+  }
+
+  const matches = n => query && !n.isRoot && (String(n.label).toLowerCase().includes(query) || String(n.summary || "").toLowerCase().includes(query));
+
+  function renderAll() {
+    renderProgress();
+    const graph = view === "tree" || view === "dag";
+    $("#svg").style.display = graph ? "block" : "none";
+    $("#route").style.display = view === "route" ? "block" : "none";
+    $("#focus").style.display = view === "focus" ? "block" : "none";
+    $("#fit").style.display = graph ? "" : "none";
+    $("#lg-dag").style.display = view === "dag" ? "" : "none";
+    document.querySelector(".legend").style.visibility = graph ? "visible" : "hidden";
+    document.querySelector(".hint").style.visibility = graph ? "visible" : "hidden";
+    if (view === "tree") renderTree();
+    else if (view === "dag") renderDag();
+    else if (view === "route") renderRoute();
+    else renderFocus();
+  }
+
+  function fitView() {
+    if (view !== "tree" && view !== "dag") return;
+    const b = vp.getBBox(), W = svg.clientWidth, H = svg.clientHeight;
+    if (!b.width || !W) return;
+    k = Math.min(1.25, Math.max(0.2, Math.min((W - 60) / b.width, (H - 90) / b.height)));
+    tx = (W - b.width * k) / 2 - b.x * k;
+    ty = (H - b.height * k) / 2 - b.y * k - 10;
+    applyT();
+  }
+  function centerOn(id) {
+    const n = byId.get(id);
+    if (!n || n._x == null) return;
+    tx = svg.clientWidth / 2 - (n._x + (n._w || 80) / 2) * k;
+    ty = svg.clientHeight / 2 - n._y * k;
+    applyT();
+  }
+
+  // ---------- events ----------
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+    view = b.dataset.view;
+    renderAll();
+    fitView();
+  }));
+  $("#fit").addEventListener("click", fitView);
+  $("#close").addEventListener("click", () => { $("#panel").classList.remove("open"); selected = null; renderAll(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") $("#close").click(); });
+
+  function select(id) { selected = id; renderAll(); showDetail(id); }
+  document.addEventListener("click", e => {
+    const t = e.target.closest("[data-toggle]");
+    if (t) { const id = t.dataset.toggle; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); renderAll(); return; }
+    const sb = e.target.closest("[data-status]");
+    if (sb) { setStatus($("#pbody").dataset.id, sb.dataset.status); return; }
+    const nd = e.target.closest("[data-id]");
+    if (nd && !moved && nd.id !== "pbody") {
+      const id = nd.dataset.id;
+      if (view === "tree") { // make sure the node is visible
+        let p = byId.get(id)._parent;
+        while (p && p !== ROOT_ID) { collapsed.delete(p); p = byId.get(p)._parent; }
+      }
+      select(id);
+      if (nd.classList.contains("chip") && view !== "route") centerOn(id);
+    }
+  });
+
+  let drag = null, moved = false;
+  svg.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, tx: tx, ty: ty }; moved = false; });
+  window.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+    moved = true; svg.classList.add("dragging");
+    tx = drag.tx + dx; ty = drag.ty + dy; applyT();
+  });
+  window.addEventListener("pointerup", () => { drag = null; svg.classList.remove("dragging"); setTimeout(() => { moved = false; }, 0); });
+  svg.addEventListener("wheel", e => {
+    e.preventDefault();
+    const r = svg.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    const nk = Math.min(3, Math.max(0.15, k * Math.exp(-e.deltaY * 0.0015)));
+    tx = mx - (mx - tx) * nk / k; ty = my - (my - ty) * nk / k; k = nk; applyT();
+  }, { passive: false });
+
+  $("#search").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); renderAll(); });
+  $("#search").addEventListener("keydown", e => {
+    if (e.key !== "Enter" || !query) return;
+    const hit = nodes.find(matches);
+    if (hit) { select(hit.id); if (view !== "route") centerOn(hit.id); }
+  });
+
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2200); }
+  $("#export").addEventListener("click", () => {
+    const group = s => nodes.filter(n => statusOf(n) === s).map(n => n.label + "(" + n.id + ")").join("、") || "无";
+    const text = "【知识地图进度】" + (DATA.topic || "") + (DATA.slug ? "（" + DATA.slug + "）" : "") +
+      "\n已掌握：" + group("mastered") + "\n已会：" + group("known") + "\n学习中：" + group("learning") + "\n跳过：" + group("skip") +
+      "\n请据此更新 map.json 的 status。";
+    const fallback = () => { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("已复制，粘贴回对话即可同步进度"); } catch (e) { prompt("复制下面的文字：", text); } ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast("已复制，粘贴回对话即可同步进度"), fallback);
+    else fallback();
+  });
+  $("#theme").addEventListener("click", () => {
+    const html = document.documentElement;
+    const dark = html.dataset.theme ? html.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    html.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("pathfinder:theme", html.dataset.theme); } catch (e) {}
+  });
+  try { const th = localStorage.getItem("pathfinder:theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+
+  renderHeader();
+  if (DATA.focus) { // action-mode maps open on the one-page battle plan
+    $("#tab-focus").style.display = "";
+    view = "focus";
+    document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x.dataset.view === "focus"));
+  }
+  renderAll();
+  requestAnimationFrame(fitView);
+  window.addEventListener("resize", () => { if (view !== "route") fitView(); });
+})();
+</script>
+</body>
+</html>

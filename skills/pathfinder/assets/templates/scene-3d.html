@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>梯度下降</title>
+<!--
+  Pathfinder 3D 讲解场景模板（Three.js 0.160.0，经 jsDelivr 加载）
+  使用方法：复制到 learning/<slug>/visuals/，然后只改 ★ 标记的部分：
+    ★1 CONFIG：标题、参数、分步讲解
+    ★2 buildScene(ctx)：创建一次性物体，返回你需要在 update 中用到的引用
+    ★3 update(ctx, objs, t, P, step)：每帧更新（t 秒，P 参数，step 当前步骤）
+  ctx 提供：THREE, scene, camera, label(text, position, color) 创建跟随 3D 位置的文字标签，
+            color(name) 读取主题色（"c1".."c4","ink","muted","grid"），isDark。
+  框架已处理：轨道相机（拖拽旋转/右键平移/滚轮缩放）、灯光、网格、步骤面板、滑块、深浅色、CDN 失败提示。
+  默认内容是一个可运行的示例：在损失曲面上做梯度下降。
+  如果 jsDelivr 无法访问，把下面 importmap 中的 cdn.jsdelivr.net/npm 换成 unpkg.com。
+-->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+:root { --bg: #f6f5f1; --panel: #ffffff; --ink: #1f1e1b; --muted: #6d6b64; --line: #dcd8cd; --grid: #d6d2c6; --c1: #3355d1; --c2: #d9480f; --c3: #2b8a3e; --c4: #ae3ec9; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #17171a; --panel: #212126; --ink: #ecebe6; --muted: #9b998f; --line: #393941; --grid: #3a3a42; --c1: #7c96ff; --c2: #ff8a4c; --c3: #51cf66; --c4: #da77f2; }
+}
+:root[data-theme="dark"] { --bg: #17171a; --panel: #212126; --ink: #ecebe6; --muted: #9b998f; --line: #393941; --grid: #3a3a42; --c1: #7c96ff; --c2: #ff8a4c; --c3: #51cf66; --c4: #da77f2; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; display: grid; grid-template-columns: 1fr 340px; grid-template-rows: auto 1fr; height: 100vh; }
+header { grid-column: 1 / -1; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 19px; }
+.sub { color: var(--muted); }
+#view { position: relative; min-height: 0; overflow: hidden; }
+#view canvas { display: block; }
+#labels { position: absolute; inset: 0; pointer-events: none; }
+.lbl { font-size: 13px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 80%, transparent); white-space: nowrap; }
+#readout { position: absolute; right: 14px; top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font: 13px/1.5 ui-monospace, Consolas, monospace; white-space: pre; }
+#readout:empty { display: none; }
+#err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; color: var(--muted); }
+.hint { position: absolute; left: 14px; bottom: 10px; font-size: 12px; color: var(--muted); }
+aside { border-left: 1px solid var(--line); background: var(--panel); padding: 16px 18px; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
+.ctrl { display: flex; gap: 6px; flex-wrap: wrap; }
+button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.primary { background: var(--c1); border-color: var(--c1); color: #fff; }
+label.param { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 13px; }
+label.param input { grid-column: 1 / -1; width: 100%; accent-color: var(--c1); }
+label.param output { font-family: ui-monospace, Consolas, monospace; color: var(--muted); }
+.steps { display: flex; flex-direction: column; gap: 6px; }
+.step { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; opacity: .55; transition: opacity .2s; }
+.step.on { opacity: 1; border-color: var(--c1); box-shadow: inset 3px 0 0 var(--c1); }
+.step b { display: block; font-size: 13px; }
+.step p { margin: 2px 0 0; font-size: 13px; }
+.step .try { color: var(--c2); }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 6px; }
+@media (max-width: 760px) {
+  body { grid-template-columns: 1fr; grid-template-rows: auto 55vh auto; height: auto; }
+  header { padding: 12px 16px; }
+  aside { border-left: none; border-top: 1px solid var(--line); padding: 14px 16px; }
+}
+</style>
+</head>
+<body>
+<header><h1 id="title"></h1><span class="sub" id="subtitle"></span></header>
+<div id="view"><div id="labels"></div><div id="readout"></div><div id="err"></div><div class="hint">拖拽旋转 · 右键平移 · 滚轮缩放</div></div>
+<aside>
+  <div class="ctrl">
+    <button id="play" class="primary">⏸ 暂停</button>
+    <button id="prev">◀ 上一步</button>
+    <button id="next">下一步 ▶</button>
+    <button id="reset">↺ 重置</button>
+  </div>
+  <div id="params-box"><h2>参数（动手试试）</h2><div id="params" style="display:flex;flex-direction:column;gap:10px"></div></div>
+  <div><h2>分步讲解</h2><div class="steps" id="steps"></div></div>
+</aside>
+<script type="module">
+/* ★1 ===================== CONFIG ===================== */
+const CONFIG = {
+  title: "梯度下降",
+  subtitle: "沿着最陡的下坡方向，一步步走到谷底",
+  camera: [9, 7, 10],      // 相机初始位置
+  target: [0, 1.2, 0],      // 相机看向的点
+  params: [
+    { id: "lr", label: "学习率（步长）", min: 0.02, max: 1.2, step: 0.02, value: 0.15 },
+    { id: "sy", label: "y 方向陡峭程度", min: 0.2, max: 3, step: 0.1, value: 1.5 },
+  ],
+  steps: [
+    { title: "损失曲面", text: "高度代表误差（损失）。我们想找到最低点，但只能感知脚下的坡度。" },
+    { title: "起点", text: "随机放一个点（红色）。它不知道谷底在哪。" },
+    { title: "梯度", text: "黄色箭头是梯度的反方向：在当前位置，往这个方向走下降最快。" },
+    { title: "一步步走", text: "每一步沿箭头走一段距离（学习率 × 梯度）。绿线是走过的路径。", try: "把学习率调到 0.6 以上，观察路径如何来回震荡甚至发散。" },
+  ],
+};
+
+/* ★2 ===================== 一次性构建 ===================== */
+function buildScene(ctx) {
+  const { THREE, scene } = ctx;
+  const f = (x, y, P) => 0.12 * x * x + 0.12 * P.sy * y * y; // 损失函数
+  const grad = (x, y, P) => [0.24 * x, 0.24 * P.sy * y];
+  // 曲面
+  const geo = new THREE.PlaneGeometry(8, 8, 60, 60);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshStandardMaterial({ color: ctx.color("c1"), roughness: 0.8, metalness: 0, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+  const surface = new THREE.Mesh(geo, mat);
+  const wire = new THREE.LineSegments(new THREE.WireframeGeometry(geo), new THREE.LineBasicMaterial({ color: ctx.color("c1"), transparent: true, opacity: 0.18 }));
+  scene.add(surface, wire);
+  // 小球、箭头、路径
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.15, 24, 16), new THREE.MeshStandardMaterial({ color: ctx.color("c2") }));
+  const arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 1, 0xf59f00, 0.3, 0.18);
+  const pathGeo = new THREE.BufferGeometry();
+  const path = new THREE.Line(pathGeo, new THREE.LineBasicMaterial({ color: ctx.color("c3"), linewidth: 2 }));
+  scene.add(ball, arrow, path);
+  const tag = ctx.label("起点", new THREE.Vector3(), "c2");
+  ctx.label("最低点", new THREE.Vector3(0, 0.1, 0), "c3");
+  return { f, grad, geo, ball, arrow, path, pathGeo, tag, state: null, lastSy: null, acc: 0 };
+}
+
+/* ★3 ===================== 每帧更新 ===================== */
+function update(ctx, o, t, P, step, dt) {
+  const { THREE } = ctx;
+  if (o.lastSy !== P.sy) { // 参数改变时重新塑形曲面
+    const pos = o.geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) pos.setY(i, o.f(pos.getX(i), pos.getZ(i), P));
+    pos.needsUpdate = true; o.geo.computeVertexNormals();
+    o.lastSy = P.sy; o.state = null;
+  }
+  if (!o.state || step < 3) o.state = { x: 3.4, y: 3.0, trail: [] };
+  const s = o.state;
+  if (step >= 3 && s.trail.length < 120) { // 每 0.35 秒走一步
+    o.acc += dt;
+    if (o.acc > 0.35) {
+      o.acc = 0;
+      s.trail.push([s.x, s.y]);
+      const g = o.grad(s.x, s.y, P);
+      s.x -= P.lr * g[0] * 4; s.y -= P.lr * g[1] * 4;
+      if (Math.abs(s.x) > 6 || Math.abs(s.y) > 6) s.trail.length = 120; // 发散了，停止
+    }
+  }
+  const h = o.f(s.x, s.y, P);
+  o.ball.position.set(s.x, h + 0.15, s.y);
+  o.ball.visible = step >= 1;
+  o.tag.visible = step >= 1 && step < 3;
+  o.tag.position.set(3.4, o.f(3.4, 3.0, P) + 0.5, 3.0);
+  const g = o.grad(s.x, s.y, P), len = Math.hypot(g[0], g[1]);
+  o.arrow.visible = step >= 2 && len > 1e-3;
+  if (len > 1e-3) {
+    const dir = new THREE.Vector3(-g[0], 0, -g[1]).normalize();
+    o.arrow.position.copy(o.ball.position);
+    o.arrow.setDirection(dir);
+    o.arrow.setLength(Math.min(2, 0.4 + len), 0.3, 0.18);
+  }
+  const pts = s.trail.concat([[s.x, s.y]]).map(p => new THREE.Vector3(p[0], o.f(p[0], p[1], P) + 0.05, p[1]));
+  o.pathGeo.setFromPoints(pts);
+  o.path.visible = step >= 3;
+  ctx.readout = "位置: (" + s.x.toFixed(2) + ", " + s.y.toFixed(2) + ")\n损失: " + h.toFixed(3) + "\n步数: " + s.trail.length;
+}
+
+/* ===================== 框架（一般不用改） ===================== */
+const $ = id => document.getElementById(id);
+document.title = CONFIG.title;
+$("title").textContent = CONFIG.title;
+$("subtitle").textContent = CONFIG.subtitle || "";
+const P = {};
+let step = 0, playing = true;
+
+CONFIG.params.forEach(p => {
+  P[p.id] = p.value;
+  const el = document.createElement("label");
+  el.className = "param";
+  el.innerHTML = "<span>" + p.label + "</span><output>" + p.value + (p.unit || "") + "</output><input type=range min=" + p.min + " max=" + p.max + " step=" + (p.step || 0.01) + " value=" + p.value + ">";
+  el.querySelector("input").addEventListener("input", e => { P[p.id] = parseFloat(e.target.value); el.querySelector("output").textContent = e.target.value + (p.unit || ""); });
+  $("params").appendChild(el);
+});
+if (!CONFIG.params.length) $("params-box").style.display = "none";
+function renderSteps() {
+  $("steps").innerHTML = CONFIG.steps.map((s, i) => '<div class="step' + (i === step ? " on" : "") + '" data-i="' + i + '"><b>' + (i + 1) + ". " + s.title + "</b><p>" + s.text + "</p>" + (s.try ? '<p class="try">👉 ' + s.try + "</p>" : "") + "</div>").join("");
+}
+const go = i => { step = Math.max(0, Math.min(CONFIG.steps.length - 1, i)); renderSteps(); };
+$("steps").addEventListener("click", e => { const s = e.target.closest(".step"); if (s) go(+s.dataset.i); });
+$("next").onclick = () => go(step + 1);
+$("prev").onclick = () => go(step - 1);
+const setPlay = v => { playing = v; $("play").textContent = v ? "⏸ 暂停" : "▶ 播放"; };
+$("play").onclick = () => setPlay(!playing);
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === " ") { e.preventDefault(); setPlay(!playing); }
+  if (e.key === "ArrowRight") go(step + 1);
+  if (e.key === "ArrowLeft") go(step - 1);
+});
+renderSteps();
+
+try {
+  const THREE = await import("three");
+  const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+  const view = $("view");
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue("--" + n).trim();
+  const isDark = () => matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light" || document.documentElement.dataset.theme === "dark";
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  view.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+  camera.position.set(...CONFIG.camera);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(...CONFIG.target);
+  controls.enableDamping = true;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x666677, 1.4));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(5, 10, 6); scene.add(sun);
+  const grid = new THREE.GridHelper(10, 10, css("grid"), css("grid")); grid.position.y = -0.01; scene.add(grid);
+
+  const labels = [];
+  const ctx = {
+    THREE, scene, camera, renderer, readout: "",
+    color: n => new THREE.Color(css(n)),
+    isDark,
+    label(text, position, color) {
+      const el = document.createElement("div");
+      el.className = "lbl"; el.textContent = text; el.style.color = css(color || "ink");
+      el.style.position = "absolute"; $("labels").appendChild(el);
+      const obj = { el, position: position.clone(), visible: true };
+      labels.push(obj);
+      return obj;
+    },
+  };
+  const objs = buildScene(ctx);
+  $("reset").onclick = () => { go(0); objs.state = null; camera.position.set(...CONFIG.camera); controls.target.set(...CONFIG.target); };
+
+  function resize() {
+    const w = view.clientWidth, h = view.clientHeight;
+    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize); resize();
+
+  const clock = new THREE.Clock();
+  let t = 0;
+  const v = new THREE.Vector3();
+  renderer.setAnimationLoop(() => {
+    const dt = Math.min(0.05, clock.getDelta());
+    if (playing) { t += dt; update(ctx, objs, t, P, step, dt); }
+    controls.update();
+    renderer.render(scene, camera);
+    const w = view.clientWidth, h = view.clientHeight;
+    labels.forEach(l => {
+      v.copy(l.position).project(camera);
+      const show = l.visible && v.z < 1;
+      l.el.style.display = show ? "" : "none";
+      if (show) l.el.style.transform = "translate(-50%,-50%) translate(" + ((v.x + 1) / 2 * w) + "px," + ((1 - v.y) / 2 * h) + "px)";
+    });
+    $("readout").textContent = ctx.readout || "";
+  });
+} catch (err) {
+  console.error(err);
+  $("err").style.display = "flex";
+  $("err").innerHTML = "3D 库加载失败（" + err.message + "）。<br>请检查网络，或把页面源码 importmap 中的 cdn.jsdelivr.net/npm 换成 unpkg.com 后重试。";
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+*.skill
+__pycache__/
+*.pyc
+learning/
+.DS_Store

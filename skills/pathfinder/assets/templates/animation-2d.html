@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>波的叠加</title>
+<!--
+  Pathfinder 2D 讲解动画模板（零依赖）
+  使用方法：复制到 learning/<slug>/visuals/，然后只改 ★ 标记的三处：
+    ★1 CONFIG：标题、副标题、参数滑块、分步讲解
+    ★2 draw(g, t, P, step)：每帧绘制。g 是绘图助手，t 是秒，P 是参数值，step 是当前步骤序号
+    ★3 （可选）readout(t, P, step)：右上角实时数值
+  框架已经处理好：播放/暂停/单步/重置、速度、滑块、步骤面板、深浅色、高 DPI、窗口缩放、键盘快捷键（空格 ← →）。
+  默认内容是一个可运行的示例：两个正弦波的叠加。
+-->
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --ink: #1f1e1b; --muted: #6d6b64; --line: #dcd8cd; --grid: #ebe8df;
+  --c1: #3355d1; --c2: #d9480f; --c3: #2b8a3e; --c4: #ae3ec9; --hl: #f59f00;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #17171a; --panel: #212126; --ink: #ecebe6; --muted: #9b998f; --line: #393941; --grid: #2a2a30; --c1: #7c96ff; --c2: #ff8a4c; --c3: #51cf66; --c4: #da77f2; --hl: #ffd43b; }
+}
+:root[data-theme="dark"] { --bg: #17171a; --panel: #212126; --ink: #ecebe6; --muted: #9b998f; --line: #393941; --grid: #2a2a30; --c1: #7c96ff; --c2: #ff8a4c; --c3: #51cf66; --c4: #da77f2; --hl: #ffd43b; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; display: grid; grid-template-columns: 1fr 340px; grid-template-rows: auto 1fr; height: 100vh; }
+header { grid-column: 1 / -1; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 19px; }
+.sub { color: var(--muted); }
+#wrap { position: relative; min-height: 0; }
+canvas { width: 100%; height: 100%; display: block; }
+#readout { position: absolute; right: 14px; top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font: 13px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre; }
+#readout:empty { display: none; }
+aside { border-left: 1px solid var(--line); background: var(--panel); padding: 16px 18px; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
+.ctrl { display: flex; gap: 6px; flex-wrap: wrap; }
+button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.primary { background: var(--c1); border-color: var(--c1); color: #fff; }
+label.param { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 13px; }
+label.param input { grid-column: 1 / -1; width: 100%; accent-color: var(--c1); }
+label.param output { font-family: ui-monospace, Consolas, monospace; color: var(--muted); }
+.steps { display: flex; flex-direction: column; gap: 6px; }
+.step { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; opacity: .55; transition: opacity .2s, border-color .2s; }
+.step.on { opacity: 1; border-color: var(--c1); box-shadow: inset 3px 0 0 var(--c1); }
+.step b { display: block; font-size: 13px; }
+.step p { margin: 2px 0 0; font-size: 13px; }
+.step .try { color: var(--c2); }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 6px; }
+.speed { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+@media (max-width: 760px) {
+  body { grid-template-columns: 1fr; grid-template-rows: auto 55vh auto; height: auto; }
+  header { padding: 12px 16px; }
+  aside { border-left: none; border-top: 1px solid var(--line); padding: 14px 16px; }
+}
+</style>
+</head>
+<body>
+<header><h1 id="title"></h1><span class="sub" id="subtitle"></span></header>
+<div id="wrap"><canvas id="cv"></canvas><div id="readout"></div></div>
+<aside>
+  <div>
+    <div class="ctrl">
+      <button id="play" class="primary">▶ 播放</button>
+      <button id="prev">◀ 上一步</button>
+      <button id="next">下一步 ▶</button>
+      <button id="reset">↺ 重置</button>
+    </div>
+    <div class="speed" style="margin-top:8px">速度 <input id="speed" type="range" min="0.1" max="3" step="0.1" value="1"> <span id="speedv">1.0×</span></div>
+  </div>
+  <div id="params-box"><h2>参数（动手试试）</h2><div id="params" style="display:flex;flex-direction:column;gap:10px"></div></div>
+  <div><h2>分步讲解</h2><div class="steps" id="steps"></div></div>
+</aside>
+<script>
+/* ★1 ===================== CONFIG ===================== */
+const CONFIG = {
+  title: "波的叠加",
+  subtitle: "两个正弦波相加，会得到什么？",
+  // 参数：id 会作为 P.id 传给 draw()
+  params: [
+    { id: "f1", label: "波 A 频率", min: 0.5, max: 5, step: 0.1, value: 1, unit: " Hz" },
+    { id: "f2", label: "波 B 频率", min: 0.5, max: 5, step: 0.1, value: 3, unit: " Hz" },
+    { id: "a2", label: "波 B 振幅", min: 0, max: 1, step: 0.05, value: 0.5 },
+  ],
+  // 分步讲解：每一步一句"现在在发生什么"，可选 try 字段提示用户去动手
+  steps: [
+    { title: "波 A", text: "先看一个简单的正弦波：蓝线。它只有一个频率。" },
+    { title: "波 B", text: "再来一个频率更高、振幅更小的波：橙线。" },
+    { title: "逐点相加", text: "在每个时刻，把两条线的高度相加——竖直的黄色虚线就是正在相加的位置。" },
+    { title: "叠加结果", text: "绿线就是结果：一个看起来复杂的波形，其实只由两个简单的波组成。", try: "试试把波 B 的频率调到 1.1，观察出现的\"拍\"。" },
+  ],
+  loop: true, // 时间是否持续流动
+};
+
+/* ★2 ===================== 绘制 ===================== */
+function draw(g, t, P, step) {
+  const { W, H } = g;
+  const mid = H / 2, amp = H * 0.18, span = 2; // 横轴显示 2 秒
+  const X = s => 40 + (s / span) * (W - 80);
+  g.grid(40, mid - amp * 2, W - 80, amp * 4);
+  g.line(40, mid, W - 40, mid, "var(--line)", 1);
+  const A = s => Math.sin(2 * Math.PI * P.f1 * (s + t));
+  const B = s => P.a2 * Math.sin(2 * Math.PI * P.f2 * (s + t));
+  g.plot(s => mid - amp * A(s), 0, span, X, "var(--c1)", step >= 3 ? 1.5 : 2.5, step >= 3 ? 0.35 : 1);
+  if (step >= 1) g.plot(s => mid - amp * B(s), 0, span, X, "var(--c2)", step >= 3 ? 1.5 : 2.5, step >= 3 ? 0.35 : 1);
+  if (step >= 2) {
+    const s0 = (t * 0.4) % span;
+    g.line(X(s0), mid - amp * 2, X(s0), mid + amp * 2, "var(--hl)", 1.5, [5, 4]);
+    g.dot(X(s0), mid - amp * A(s0), 5, "var(--c1)");
+    g.dot(X(s0), mid - amp * B(s0), 5, "var(--c2)");
+    g.dot(X(s0), mid - amp * (A(s0) + B(s0)), 6, "var(--c3)");
+    g.plot(s => mid - amp * (A(s) + B(s)), 0, step >= 3 ? span : s0, X, "var(--c3)", 3);
+  }
+  g.text("A", 14, mid - amp * A(0), "var(--c1)", 14, "bold");
+  if (step >= 1) g.text("B", 14, mid - amp * B(0) + 14, "var(--c2)", 14, "bold");
+  if (step >= 2) g.text("A+B", W - 36, mid - amp * (A(span) + B(span)), "var(--c3)", 14, "bold");
+}
+
+/* ★3 ===================== 实时数值（可选，返回字符串或空） ===================== */
+function readout(t, P, step) {
+  return "A: " + P.f1.toFixed(1) + " Hz\nB: " + P.f2.toFixed(1) + " Hz × " + P.a2.toFixed(2) + (step >= 3 ? "\n频率差: " + Math.abs(P.f1 - P.f2).toFixed(1) + " Hz" : "");
+}
+
+/* ===================== 框架（一般不用改） ===================== */
+(function () {
+  const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  const P = {}, $ = id => document.getElementById(id);
+  let t = 0, playing = true, step = 0, speed = 1, last = performance.now();
+  document.title = CONFIG.title;
+  $("title").textContent = CONFIG.title;
+  $("subtitle").textContent = CONFIG.subtitle || "";
+
+  const cssVar = c => c && c.startsWith("var(") ? getComputedStyle(document.documentElement).getPropertyValue(c.slice(4, -1)).trim() : c;
+  const g = {
+    W: 0, H: 0, ctx,
+    line(x1, y1, x2, y2, c, w, dash) { ctx.save(); ctx.strokeStyle = cssVar(c || "var(--ink)"); ctx.lineWidth = w || 1.5; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore(); },
+    path(pts, c, w, alpha, close, fill) { if (pts.length < 2) return; ctx.save(); ctx.globalAlpha = alpha == null ? 1 : alpha; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); if (close) ctx.closePath(); if (fill) { ctx.fillStyle = cssVar(fill); ctx.fill(); } if (c) { ctx.strokeStyle = cssVar(c); ctx.lineWidth = w || 2; ctx.lineJoin = "round"; ctx.stroke(); } ctx.restore(); },
+    plot(fn, a, b, X, c, w, alpha, n) { const pts = [], N = n || 400; for (let i = 0; i <= N; i++) { const s = a + (b - a) * i / N; pts.push([X(s), fn(s)]); } this.path(pts, c, w, alpha); },
+    dot(x, y, r, c) { ctx.save(); ctx.fillStyle = cssVar(c || "var(--ink)"); ctx.beginPath(); ctx.arc(x, y, r || 4, 0, Math.PI * 2); ctx.fill(); ctx.restore(); },
+    circle(x, y, r, c, w, fill) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = cssVar(fill); ctx.fill(); } if (c) { ctx.strokeStyle = cssVar(c); ctx.lineWidth = w || 1.5; ctx.stroke(); } ctx.restore(); },
+    rect(x, y, w, h, c, fill, r) { ctx.save(); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r || 0) : ctx.rect(x, y, w, h); if (fill) { ctx.fillStyle = cssVar(fill); ctx.fill(); } if (c) { ctx.strokeStyle = cssVar(c); ctx.lineWidth = 1.5; ctx.stroke(); } ctx.restore(); },
+    arrow(x1, y1, x2, y2, c, w) { const a = Math.atan2(y2 - y1, x2 - x1), h = 9; this.line(x1, y1, x2, y2, c, w); this.path([[x2 - h * Math.cos(a - 0.4), y2 - h * Math.sin(a - 0.4)], [x2, y2], [x2 - h * Math.cos(a + 0.4), y2 - h * Math.sin(a + 0.4)]], null, 0, 1, true, c); },
+    text(s, x, y, c, size, weight, align) { ctx.save(); ctx.fillStyle = cssVar(c || "var(--ink)"); ctx.font = (weight || "") + " " + (size || 13) + "px system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif"; ctx.textAlign = align || "left"; ctx.textBaseline = "middle"; ctx.fillText(s, x, y); ctx.restore(); },
+    grid(x, y, w, h, n) { n = n || 8; for (let i = 0; i <= n; i++) { this.line(x + w * i / n, y, x + w * i / n, y + h, "var(--grid)", 1); this.line(x, y + h * i / n, x + w, y + h * i / n, "var(--grid)", 1); } },
+    clear() { ctx.fillStyle = cssVar("var(--bg)"); ctx.fillRect(0, 0, this.W, this.H); },
+  };
+
+  function resize() {
+    const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d);
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    g.W = r.width; g.H = r.height;
+  }
+  window.addEventListener("resize", resize);
+
+  CONFIG.params.forEach(p => {
+    P[p.id] = p.value;
+    const el = document.createElement("label");
+    el.className = "param";
+    el.innerHTML = "<span>" + p.label + "</span><output>" + p.value + (p.unit || "") + "</output><input type=range min=" + p.min + " max=" + p.max + " step=" + (p.step || 0.01) + " value=" + p.value + ">";
+    el.querySelector("input").addEventListener("input", e => { P[p.id] = parseFloat(e.target.value); el.querySelector("output").textContent = e.target.value + (p.unit || ""); });
+    $("params").appendChild(el);
+  });
+  if (!CONFIG.params.length) $("params-box").style.display = "none";
+
+  function renderSteps() {
+    $("steps").innerHTML = CONFIG.steps.map((s, i) => '<div class="step' + (i === step ? " on" : "") + '" data-i="' + i + '"><b>' + (i + 1) + ". " + s.title + "</b><p>" + s.text + "</p>" + (s.try ? '<p class="try">👉 ' + s.try + "</p>" : "") + "</div>").join("");
+  }
+  const go = i => { step = Math.max(0, Math.min(CONFIG.steps.length - 1, i)); renderSteps(); };
+  $("steps").addEventListener("click", e => { const s = e.target.closest(".step"); if (s) go(+s.dataset.i); });
+  $("next").onclick = () => go(step + 1);
+  $("prev").onclick = () => go(step - 1);
+  $("reset").onclick = () => { t = 0; go(0); };
+  const setPlay = v => { playing = v; $("play").textContent = v ? "⏸ 暂停" : "▶ 播放"; };
+  $("play").onclick = () => setPlay(!playing);
+  $("speed").oninput = e => { speed = parseFloat(e.target.value); $("speedv").textContent = speed.toFixed(1) + "×"; };
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT") return;
+    if (e.key === " ") { e.preventDefault(); setPlay(!playing); }
+    if (e.key === "ArrowRight") go(step + 1);
+    if (e.key === "ArrowLeft") go(step - 1);
+  });
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (playing && CONFIG.loop !== false) t += dt * speed;
+    g.clear();
+    try { draw(g, t, P, step); } catch (err) { g.text("draw() 出错：" + err.message, 20, 30, "var(--c2)"); }
+    $("readout").textContent = typeof readout === "function" ? (readout(t, P, step) || "") : "";
+    requestAnimationFrame(frame);
+  }
+  resize(); renderSteps(); setPlay(true);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

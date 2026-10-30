@@ -1,0 +1,19 @@
+{
+  "name": "pathfinder-skill",
+  "owner": {
+    "name": "yexiaohua"
+  },
+  "metadata": {
+    "description": "Pathfinder: first-principles learning and action navigation skill",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "pathfinder",
+      "description": "从第一性原理出发学习任何概念、拆解课件，并为自媒体、电商等目标生成聚焦的一页纸作战图与交互式知识地图",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/pathfinder"]
+    }
+  ]
+}

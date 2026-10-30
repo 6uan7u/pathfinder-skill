@@ -1,0 +1,95 @@
+{
+  "topic": "从零做知识类自媒体",
+  "slug": "self-media",
+  "mode": "action",
+  "problem": "在注意力极度稀缺的平台上，怎样用有限的时间让一群特定的人持续看你、信任你，并愿意为你提供的价值付费？",
+  "core": "自媒体不是「发视频」，而是「为一群特定的人持续解决具体问题」，流量和变现都是这件事的结果",
+  "learner": "示例用户：有本职专业技能（如设计），零粉丝零作品，每周可投入约 8 小时",
+  "updated": "2026-10-30",
+  "detours": [
+    "开始前花几周研究相机、灯光和剪辑软件——手机足够，早期瓶颈永远是内容",
+    "同时做多个平台、多个方向——注意力被切碎，每个都拿不到有效反馈",
+    "先买高价「起号课」——大部分内容在平台官方学习中心和对标账号里免费可得",
+    "发了五六条没起色就换方向——样本太少，数据还不能说明任何问题",
+    "追与自己领域无关的热点——带来的粉丝不精准，之后无法变现"
+  ],
+  "focus": {
+    "goal": "用一个垂直领域账号，建立能转化为收入的个人影响力",
+    "success": "3 个月内稳定周更，并有内容带来第一笔咨询或成交",
+    "formula": "变现 ≈ 精准受众 × 信任 × 变现方式匹配度",
+    "factors": [
+      { "name": "精准受众", "state": "0 粉，未开始", "bottleneck": true },
+      { "name": "信任", "state": "还没有作品" },
+      { "name": "变现方式匹配度", "state": "有专业技能，可做咨询/模板/课程" }
+    ],
+    "bottleneck": "还没有任何作品接受市场检验。在受众为 0 时，后两个变量都无从谈起，所以现在只解决「产出并发布」",
+    "priority": "4 周内用同一种固定格式发布 12 条内容，每条回答目标受众的一个具体问题",
+    "essentials": [
+      "定位 = 一句话说清「我帮 ____ 的人解决 ____ 问题」",
+      "选题来自受众的真实提问（评论区、问答平台、对标账号的高赞评论），不来自自己的灵感",
+      "开头几秒直接给出结果、冲突或悬念，决定了用户是否继续看",
+      "找 3 个同领域、成绩可验证的对标账号，拆解它们的选题和结构，而不是模仿表面风格",
+      "只看两个数据：完播/读完率（内容是否抓人）和收藏/转发率（内容是否有用）"
+    ],
+    "not_doing": [
+      { "item": "研究设备与高级剪辑", "why": "手机 + 平台自带剪辑足够", "until": "稳定周更 4 周后" },
+      { "item": "同时运营多个平台", "why": "先在一个平台验证内容", "until": "单平台有稳定数据后再做分发" },
+      { "item": "投流、买粉", "why": "内容未经验证，花钱只会放大无效内容", "until": "有自然流量表现好的内容之后" },
+      { "item": "做私域、设计变现产品", "why": "还没有受众", "until": "有人主动在评论/私信咨询时" },
+      { "item": "每天反复刷数据", "why": "单条数据波动大，徒增焦虑", "until": "改为每周复盘一次" }
+    ],
+    "metrics": {
+      "leading": "每周发布条数（目标 3 条）",
+      "outcome": "完播/读完率、收藏率，与对标账号对比",
+      "review": "每周日 15 分钟：做了什么 / 数据说明什么 / 下周唯一重点"
+    },
+    "stop_rule": "发满 20 条后，如果收藏率始终明显低于对标账号，就调整选题方向（不是放弃）",
+    "sources": [
+      { "name": "你自己的后台数据与评论区", "tier": "一手", "why": "最真实，优先级最高" },
+      { "name": "所选平台的官方创作者学习中心", "tier": "官方", "why": "规则和推荐机制以此为准，随时可能更新" },
+      { "name": "3 个对标账号", "tier": "实践者", "why": "成绩可见、可验证，按需拆解即可，不必追更所有博主" }
+    ],
+    "today": "写下定位句，并列出目标受众最常问的 20 个问题"
+  },
+  "nodes": [
+    { "id": "position", "label": "定位", "priority": "core", "summary": "决定你为谁、解决什么问题。" },
+    { "id": "audience", "label": "目标受众是谁", "parent": "position", "priority": "core", "status": "todo",
+      "summary": "越具体越好：「刚入行的 UI 设计师」比「对设计感兴趣的人」好得多。", "why": "受众决定选题、语气和变现方式，是整个公式的起点。",
+      "pitfalls": ["想讨好所有人，结果谁都不精准"], "check": "你能说出目标受众此刻最焦虑的 3 个具体问题吗？", "est": "1 小时" },
+    { "id": "value", "label": "我能提供的价值", "parent": "position", "priority": "core",
+      "summary": "你的专业技能、经历或视角中，哪部分能解决受众的问题。", "pitfalls": ["以为必须是顶级专家——比受众领先一两步就有价值"], "est": "1 小时" },
+    { "id": "benchmark", "label": "对标账号拆解", "parent": "position", "prereqs": ["audience"], "priority": "core",
+      "summary": "找 3 个同领域、成绩可验证的账号，拆解它们最受欢迎的内容：选题、开头、结构、时长。",
+      "why": "最快的学习方式是研究已经被市场验证的样本。", "pitfalls": ["模仿表面风格（滤镜、背景音乐）而不是底层结构"], "est": "2 小时" },
+    { "id": "content", "label": "内容生产", "priority": "core", "summary": "把价值变成能被分发的内容。" },
+    { "id": "topics", "label": "选题：受众的真实问题", "parent": "content", "prereqs": ["audience"], "priority": "core",
+      "summary": "从评论区、问答平台、对标账号高赞评论中收集受众的真实提问，建一个选题库。", "check": "你的下一条选题，能对应到某个真实用户说过的话吗？", "est": "持续" },
+    { "id": "hook", "label": "开头抓住注意力", "parent": "content", "prereqs": ["topics"], "priority": "core",
+      "summary": "开头直接给出结果、冲突或悬念，而不是自我介绍和铺垫。", "why": "平台根据早期停留数据决定是否继续推荐。", "est": "30 分钟" },
+    { "id": "format", "label": "固定内容格式", "parent": "content", "prereqs": ["benchmark"], "priority": "important",
+      "summary": "固定一种结构（如：问题 → 错误做法 → 正确做法 → 一句总结），降低每条内容的生产成本。", "why": "让你能持续更新，也让受众形成预期。", "est": "1 小时" },
+    { "id": "cover", "label": "封面与标题优化", "parent": "content", "prereqs": ["data"], "priority": "important",
+      "summary": "有了数据后，对比哪些标题/封面带来更高点击。", "est": "持续" },
+    { "id": "gear", "label": "设备与剪辑", "parent": "content", "prereqs": ["format"], "priority": "optional",
+      "summary": "手机 + 平台自带剪辑工具足够起步。", "est": "—" },
+    { "id": "feedback", "label": "反馈回路", "priority": "core", "summary": "用数据代替焦虑。" },
+    { "id": "data", "label": "看懂两个核心数据", "parent": "feedback", "prereqs": ["hook"], "priority": "core",
+      "summary": "完播/读完率说明内容是否抓人；收藏/转发率说明内容是否有用。", "pitfalls": ["只盯着播放量和涨粉——它们是结果，不能直接指导下一条怎么改"], "est": "30 分钟" },
+    { "id": "review", "label": "每周复盘", "parent": "feedback", "prereqs": ["data"], "priority": "core",
+      "summary": "每周 15 分钟：做了什么、数据说明什么、下周唯一重点。", "est": "每周 15 分钟" },
+    { "id": "monetize", "label": "变现与放大", "priority": "important", "summary": "受众和信任积累之后再考虑。" },
+    { "id": "interact", "label": "评论与私信互动", "parent": "monetize", "prereqs": ["review"], "priority": "important",
+      "summary": "认真回复评论和私信，这是建立信任、发现需求的最直接途径。", "est": "持续" },
+    { "id": "path", "label": "选择变现方式", "parent": "monetize", "prereqs": ["value", "interact"], "priority": "important",
+      "summary": "咨询、模板/工具、课程、接广告、带货——选和你的价值、受众需求最匹配的一种先试。", "pitfalls": ["受众还没形成就设计复杂的产品体系"], "est": "2 小时" },
+    { "id": "private", "label": "私域沉淀", "parent": "monetize", "prereqs": ["path"], "priority": "optional", "summary": "把高意向用户沉淀到可直接触达的渠道，注意遵守平台规则。" },
+    { "id": "ads", "label": "投流放大", "parent": "monetize", "prereqs": ["review"], "priority": "optional", "summary": "只给已被自然流量验证的内容加热。" },
+    { "id": "multi", "label": "多平台分发", "parent": "monetize", "prereqs": ["format", "review"], "priority": "optional", "summary": "单平台稳定后，把内容改编到其他平台。" }
+  ],
+  "stages": [
+    { "id": "s1", "label": "第 1 周：定位与对标", "goal": "说清为谁解决什么问题", "nodes": ["audience", "value", "benchmark"], "deliverable": "一句话定位 + 3 个对标账号拆解笔记 + 20 个选题" },
+    { "id": "s2", "label": "第 2-5 周：最小内容循环", "goal": "用固定格式发满 12 条", "nodes": ["topics", "hook", "format", "data"], "deliverable": "12 条已发布内容及其数据", "decision": "图文还是视频？选你能持续产出的那种，而不是看起来更火的那种" },
+    { "id": "s3", "label": "第 6 周起：按数据优化", "goal": "找到表现最好的选题类型并加倍", "nodes": ["review", "cover", "gear"], "deliverable": "一份「什么内容有效」的复盘结论" },
+    { "id": "s4", "label": "有人主动咨询后：变现与放大", "goal": "完成第一笔收入", "nodes": ["interact", "path", "private", "ads", "multi"], "deliverable": "第一个付费用户", "decision": "先做最轻的变现方式（如 1 对 1 咨询）验证需求，再考虑做课程或产品" }
+  ]
+}
