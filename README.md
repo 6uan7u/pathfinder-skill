@@ -77,7 +77,7 @@ git clone https://github.com/Blossom-stark/pathfinder-skill.git
 
 ### 方式四：Claude 网页版 / 桌面版
 
-从 [Releases](https://github.com/Blossom-stark/pathfinder-skill/releases) 下载 `pathfinder.skill`，在 Claude 的设置中找到 Skills 并上传。
+下载本仓库（Code → Download ZIP）并解压，把其中的 `skills/pathfinder` 文件夹单独压缩成 zip，然后在 Claude 的设置中找到 Skills 并上传这个 zip。
 
 ### 不支持 skills 的 agent
 
